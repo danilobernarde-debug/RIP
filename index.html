@@ -748,6 +748,8 @@ async function loadFromSheets(id) {
     st.textContent = '❌ Erro: ' + err.message + ' — tente importar o arquivo manualmente.';
     bar.style.width = '0';
     if (btn) btn.disabled = false;
+    document.getElementById('upload-screen').style.display='flex';
+    document.getElementById('app').style.display='none';
   }
 }
 async function loadFromCustomUrl() {
@@ -862,7 +864,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
   dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
   dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
-  // Auto-load default Google Sheet
+  // Show app immediately, skip upload screen
+  document.getElementById('upload-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  initMap();
+  notify('⏳ Carregando planilha...');
   loadFromSheets();
 });
 

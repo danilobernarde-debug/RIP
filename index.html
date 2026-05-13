@@ -1154,6 +1154,7 @@ function exportSchedXLSX(){
     'Carteira':         d.carteira||'—',
   }));
   const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:30},{wch:15},{wch:12},{wch:12},{wch:15},{wch:15},{wch:15},{wch:15},{wch:15}];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Quadro Semanal');
   XLSX.writeFile(wb,`Quadro_Semanal_${days[0]}_a_${days[4]}.xlsx`);

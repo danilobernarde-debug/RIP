@@ -453,7 +453,8 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
         <option value="">Todos</option><option>Pendente</option><option>Executado</option>
       </select>
     </div>
-    <div id="sched-summary" style="margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted2)"></div>
+    <div id="sched-summary" style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--muted2)"></div>
+    <button class="btn-kml-bar" style="margin-left:auto" onclick="exportSchedXLSX()">⬇ Exportar XLSX</button>
   </div>
   <div id="sched-body">
     <div class="wk-grid" id="wk-grid"></div>
@@ -1128,6 +1129,35 @@ function renderSched(){
       <div class="day-items">${cards}</div>
     </div>`;
   }).join('');
+}
+
+function exportSchedXLSX(){
+  if(!weeks.length){notify('⚠ Nenhuma semana disponível');return;}
+  const wk=weeks[wkIdx],days=getDays(wk);
+  const stF=document.getElementById('sf-st').value;
+  const items=DATA.filter(d=>{
+    if(!d.prog_inicio) return false;
+    if(stF && d.status!==stF) return false;
+    const fim=d.prog_fim||d.prog_inicio;
+    return d.prog_inicio<=days[4] && fim>=days[0];
+  });
+  if(!items.length){notify('⚠ Nenhum serviço na semana');return;}
+  const rows=items.map(d=>({
+    'Equipe (Viatura)': d.viatura||'—',
+    'Equipamento':      d.equipamento||'—',
+    'Data Início':      fmtD(d.prog_inicio),
+    'Data Fim':         fmtD(d.prog_fim||d.prog_inicio),
+    'Status':           d.status||'—',
+    'OSE':              d.ose||'—',
+    'OSI':              d.osi||'—',
+    'Id Anomalia':      d.id||'—',
+    'Carteira':         d.carteira||'—',
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Quadro Semanal');
+  XLSX.writeFile(wb,`Quadro_Semanal_${days[0]}_a_${days[4]}.xlsx`);
+  notify('📥 Planilha exportada — '+items.length+' serviço'+( items.length!==1?'s':''));
 }
 
 // ═══ MODAL ═══

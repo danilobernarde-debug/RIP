@@ -844,7 +844,7 @@ function launchApp(){
   document.getElementById('upload-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   buildStats();buildFilterOpts();buildWeeks();
-  if(!map) initMap(); else applyF();
+  if(!map) initMap(); else { placeTeamMarkers(); applyF(); }
   notify('✅ '+DATA.length.toLocaleString('pt-BR')+' serviços carregados');
 }
 function newFile(){

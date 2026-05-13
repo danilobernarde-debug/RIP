@@ -402,6 +402,7 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
     <div class="map-actions">
       <button class="btn-clear" onclick="clearFilters()">✕ Limpar</button>
       <button class="btn-kml-bar" onclick="exportKML()">⬇ KML</button>
+      <button class="btn-kml-bar" style="background:var(--amber)" onclick="toggleDistPanel()">🧭 Distância</button>
     </div>
   </div>
 
@@ -414,6 +415,20 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
     <!-- Count + hint: center top -->
     <div class="map-ov" id="mc-badge" style="top:10px"><span id="mc-n">0</span> serviços</div>
     <div class="map-ov" id="zoom-hint" style="top:42px">🔍 Aproxime para ver pontos individuais</div>
+
+    <!-- Distance panel -->
+    <div id="dist-panel" class="map-ov" style="display:none;top:10px;right:56px;background:var(--s1);border:1px solid var(--border2);border-radius:12px;padding:16px 18px;width:270px;box-shadow:0 8px 32px rgba(0,0,0,.6);backdrop-filter:blur(10px)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;letter-spacing:.5px">🧭 Distância & Tempo</span>
+        <button onclick="toggleDistPanel()" style="background:none;border:none;color:var(--muted2);cursor:pointer;font-size:18px;line-height:1">✕</button>
+      </div>
+      <label class="fl-lbl" style="margin-bottom:4px;display:block">Equipe (origem)</label>
+      <select id="dist-equipe" style="width:100%;margin-bottom:10px;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px"></select>
+      <label class="fl-lbl" style="margin-bottom:4px;display:block">Poste / Serviço (destino)</label>
+      <select id="dist-poste" style="width:100%;margin-bottom:12px;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px"></select>
+      <button onclick="calcDist()" style="width:100%;background:var(--amber);border:none;color:#07090f;font-family:'Syne',sans-serif;font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:8px;border-radius:7px;cursor:pointer">Calcular</button>
+      <div id="dist-result" style="display:none;margin-top:12px;padding:10px;background:var(--s2);border-radius:8px;font-size:13px;line-height:1.7"></div>
+    </div>
 
     <!-- Layer FAB: top-right -->
     <div class="map-ov click" id="layer-fab" style="top:10px;right:10px">
@@ -1131,6 +1146,59 @@ function renderSched(){
       <div class="day-items">${cards}</div>
     </div>`;
   }).join('');
+}
+
+function toggleDistPanel(){
+  const p=document.getElementById('dist-panel');
+  if(p.style.display==='none'){
+    const eq=document.getElementById('dist-equipe');
+    eq.innerHTML=Object.keys(TEAMS).length
+      ? Object.keys(TEAMS).map(k=>`<option value="${k}">${k}</option>`).join('')
+      : '<option value="">Nenhuma equipe carregada</option>';
+    const dp=document.getElementById('dist-poste');
+    const items=DATA.filter(d=>d.lat&&d.lng);
+    dp.innerHTML=items.length
+      ? items.map((d,i)=>`<option value="${i}">${d.poste||d.id}${d.equipamento?' — '+d.equipamento:''}</option>`).join('')
+      : '<option value="">Nenhum serviço com localização</option>';
+    document.getElementById('dist-result').style.display='none';
+    p.style.display='block';
+  } else {
+    p.style.display='none';
+  }
+}
+async function calcDist(){
+  const teamKey=document.getElementById('dist-equipe').value;
+  const team=TEAMS[teamKey];
+  const items=DATA.filter(d=>d.lat&&d.lng);
+  const svc=items[parseInt(document.getElementById('dist-poste').value)];
+  if(!team||!team.lat){notify('⚠ Equipe sem localização');return;}
+  if(!svc){notify('⚠ Serviço sem localização');return;}
+  const distLinha=haversine(team.lat,team.lng,svc.lat,svc.lng);
+  const result=document.getElementById('dist-result');
+  result.style.display='block';
+  result.innerHTML=`<div style="color:var(--muted2)">📏 Linha reta: <strong style="color:var(--text)">${distLinha.toFixed(1)} km</strong></div><div style="font-size:11px;color:var(--muted)">Calculando rota...</div>`;
+  try{
+    const url=`https://router.project-osrm.org/route/v1/driving/${team.lng},${team.lat};${svc.lng},${svc.lat}?overview=false`;
+    const resp=await fetch(url);
+    const json=await resp.json();
+    if(json.code==='Ok'&&json.routes[0]){
+      const roadKm=(json.routes[0].distance/1000).toFixed(1);
+      const mins=Math.round(json.routes[0].duration/60);
+      const h=Math.floor(mins/60),m=mins%60;
+      const tempo=h>0?`${h}h ${m}min`:`${m} min`;
+      result.innerHTML=`
+        <div>📏 Distância: <strong style="color:var(--green)">${roadKm} km</strong></div>
+        <div>🚗 Tempo est.: <strong style="color:var(--yellow)">~${tempo}</strong></div>
+        <div style="margin-top:6px;font-size:10px;color:var(--muted)">Equipe: ${teamKey} → Poste ${svc.poste||svc.id}</div>
+        <div style="font-size:10px;color:var(--muted)">via rota terrestre (OSRM)</div>`;
+    } else throw new Error();
+  } catch{
+    const tempoEst=Math.round(distLinha/60*60);
+    result.innerHTML=`
+      <div>📏 Linha reta: <strong style="color:var(--green)">${distLinha.toFixed(1)} km</strong></div>
+      <div>🚗 Tempo est.: <strong style="color:var(--yellow)">~${tempoEst} min</strong> <span style="font-size:10px;color:var(--muted)">(60 km/h)</span></div>
+      <div style="margin-top:6px;font-size:10px;color:var(--muted)">Equipe: ${teamKey} → Poste ${svc.poste||svc.id}</div>`;
+  }
 }
 
 function exportSchedXLSX(){

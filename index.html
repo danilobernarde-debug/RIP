@@ -425,7 +425,11 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
       <label class="fl-lbl" style="margin-bottom:4px;display:block">Equipe (origem)</label>
       <select id="dist-equipe" style="width:100%;margin-bottom:10px;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px"></select>
       <label class="fl-lbl" style="margin-bottom:4px;display:block">Poste / Serviço (destino)</label>
-      <select id="dist-poste" style="width:100%;margin-bottom:12px;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px"></select>
+      <div style="position:relative;margin-bottom:12px">
+        <input id="dist-poste-input" placeholder="Buscar poste ou equipamento..." autocomplete="off" oninput="filterDistPoste()" onfocus="filterDistPoste()" style="width:100%;background:var(--s2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;box-sizing:border-box">
+        <div id="dist-poste-drop" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--s2);border:1px solid var(--border2);border-radius:6px;max-height:160px;overflow-y:auto;z-index:10;margin-top:2px"></div>
+        <input type="hidden" id="dist-poste-idx" value="">
+      </div>
       <button onclick="calcDist()" style="width:100%;background:var(--amber);border:none;color:#07090f;font-family:'Syne',sans-serif;font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;padding:8px;border-radius:7px;cursor:pointer">Calcular</button>
       <div id="dist-result" style="display:none;margin-top:12px;padding:10px;background:var(--s2);border-radius:8px;font-size:13px;line-height:1.7"></div>
     </div>
@@ -909,7 +913,7 @@ function clearFilters(){
 }
 
 // ═══ MAP ═══
-let map, layerGroup, teamLayerGroup, radiusLayerGroup;
+let map, layerGroup, teamLayerGroup, radiusLayerGroup, routeLayerGroup;
 let filtered=[], teamMkrs={};
 let currentLayerName='dark';
 const ZOOM_THRESHOLD=11;
@@ -936,6 +940,7 @@ function initMap(){
   // Zoom control — bottom left
   L.control.zoom({position:'bottomleft'}).addTo(map);
   radiusLayerGroup=L.layerGroup().addTo(map);
+  routeLayerGroup=L.layerGroup().addTo(map);
   layerGroup=L.layerGroup().addTo(map);
   teamLayerGroup=L.layerGroup().addTo(map);
   map.on('zoomend moveend',()=>renderMarkers());
@@ -1148,37 +1153,61 @@ function renderSched(){
   }).join('');
 }
 
+let _distItems=[];
 function toggleDistPanel(){
   const p=document.getElementById('dist-panel');
   if(p.style.display==='none'){
-    const eq=document.getElementById('dist-equipe');
-    eq.innerHTML=Object.keys(TEAMS).length
+    document.getElementById('dist-equipe').innerHTML=Object.keys(TEAMS).length
       ? Object.keys(TEAMS).map(k=>`<option value="${k}">${k}</option>`).join('')
       : '<option value="">Nenhuma equipe carregada</option>';
-    const dp=document.getElementById('dist-poste');
-    const items=DATA.filter(d=>d.lat&&d.lng);
-    dp.innerHTML=items.length
-      ? items.map((d,i)=>`<option value="${i}">${d.poste||d.id}${d.equipamento?' — '+d.equipamento:''}</option>`).join('')
-      : '<option value="">Nenhum serviço com localização</option>';
+    _distItems=DATA.filter(d=>d.lat&&d.lng);
+    document.getElementById('dist-poste-input').value='';
+    document.getElementById('dist-poste-idx').value='';
+    document.getElementById('dist-poste-drop').style.display='none';
     document.getElementById('dist-result').style.display='none';
     p.style.display='block';
   } else {
     p.style.display='none';
+    if(routeLayerGroup) routeLayerGroup.clearLayers();
   }
+}
+function filterDistPoste(){
+  const q=document.getElementById('dist-poste-input').value.toLowerCase();
+  document.getElementById('dist-poste-idx').value='';
+  const drop=document.getElementById('dist-poste-drop');
+  const matches=_distItems.filter(d=>
+    (d.poste||'').toLowerCase().includes(q)||
+    (d.equipamento||'').toLowerCase().includes(q)||
+    String(d.id).toLowerCase().includes(q)
+  ).slice(0,60);
+  if(!matches.length){drop.style.display='none';return;}
+  drop.style.display='block';
+  drop.innerHTML=matches.map(d=>{
+    const idx=_distItems.indexOf(d);
+    const lbl=`${d.poste||d.id}${d.equipamento?' — '+d.equipamento:''}`;
+    return`<div onclick="selectDistPoste(${idx})" style="padding:6px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border);color:var(--text)" onmouseover="this.style.background='var(--s3)'" onmouseout="this.style.background=''">${lbl}</div>`;
+  }).join('');
+}
+function selectDistPoste(idx){
+  const d=_distItems[idx];
+  document.getElementById('dist-poste-idx').value=idx;
+  document.getElementById('dist-poste-input').value=`${d.poste||d.id}${d.equipamento?' — '+d.equipamento:''}`;
+  document.getElementById('dist-poste-drop').style.display='none';
 }
 async function calcDist(){
   const teamKey=document.getElementById('dist-equipe').value;
   const team=TEAMS[teamKey];
-  const items=DATA.filter(d=>d.lat&&d.lng);
-  const svc=items[parseInt(document.getElementById('dist-poste').value)];
+  const idx=parseInt(document.getElementById('dist-poste-idx').value);
+  const svc=isNaN(idx)?null:_distItems[idx];
   if(!team||!team.lat){notify('⚠ Equipe sem localização');return;}
-  if(!svc){notify('⚠ Serviço sem localização');return;}
+  if(!svc){notify('⚠ Selecione um poste/serviço');return;}
   const distLinha=haversine(team.lat,team.lng,svc.lat,svc.lng);
   const result=document.getElementById('dist-result');
   result.style.display='block';
   result.innerHTML=`<div style="color:var(--muted2)">📏 Linha reta: <strong style="color:var(--text)">${distLinha.toFixed(1)} km</strong></div><div style="font-size:11px;color:var(--muted)">Calculando rota...</div>`;
+  routeLayerGroup.clearLayers();
   try{
-    const url=`https://router.project-osrm.org/route/v1/driving/${team.lng},${team.lat};${svc.lng},${svc.lat}?overview=false`;
+    const url=`https://router.project-osrm.org/route/v1/driving/${team.lng},${team.lat};${svc.lng},${svc.lat}?overview=full&geometries=geojson`;
     const resp=await fetch(url);
     const json=await resp.json();
     if(json.code==='Ok'&&json.routes[0]){
@@ -1191,6 +1220,11 @@ async function calcDist(){
         <div>🚗 Tempo est.: <strong style="color:var(--yellow)">~${tempo}</strong></div>
         <div style="margin-top:6px;font-size:10px;color:var(--muted)">Equipe: ${teamKey} → Poste ${svc.poste||svc.id}</div>
         <div style="font-size:10px;color:var(--muted)">via rota terrestre (OSRM)</div>`;
+      const coords=json.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      L.polyline(coords,{color:'#ff8c42',weight:4,opacity:0.85}).addTo(routeLayerGroup);
+      L.circleMarker([team.lat,team.lng],{radius:8,fillColor:team.color||'#ff8c42',color:'#fff',weight:2,fillOpacity:1}).addTo(routeLayerGroup);
+      L.circleMarker([svc.lat,svc.lng],{radius:8,fillColor:'#00ff87',color:'#fff',weight:2,fillOpacity:1}).addTo(routeLayerGroup);
+      map.fitBounds(L.polyline(coords).getBounds(),{padding:[50,50]});
     } else throw new Error();
   } catch{
     const tempoEst=Math.round(distLinha/60*60);
@@ -1198,6 +1232,10 @@ async function calcDist(){
       <div>📏 Linha reta: <strong style="color:var(--green)">${distLinha.toFixed(1)} km</strong></div>
       <div>🚗 Tempo est.: <strong style="color:var(--yellow)">~${tempoEst} min</strong> <span style="font-size:10px;color:var(--muted)">(60 km/h)</span></div>
       <div style="margin-top:6px;font-size:10px;color:var(--muted)">Equipe: ${teamKey} → Poste ${svc.poste||svc.id}</div>`;
+    L.polyline([[team.lat,team.lng],[svc.lat,svc.lng]],{color:'#ff8c42',weight:3,opacity:0.7,dashArray:'10 6'}).addTo(routeLayerGroup);
+    L.circleMarker([team.lat,team.lng],{radius:8,fillColor:team.color||'#ff8c42',color:'#fff',weight:2,fillOpacity:1}).addTo(routeLayerGroup);
+    L.circleMarker([svc.lat,svc.lng],{radius:8,fillColor:'#00ff87',color:'#fff',weight:2,fillOpacity:1}).addTo(routeLayerGroup);
+    map.fitBounds([[team.lat,team.lng],[svc.lat,svc.lng]],{padding:[60,60]});
   }
 }
 

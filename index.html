@@ -1046,16 +1046,23 @@ function renderMarkers(){
       const inView=bounds.contains([lat,lng]);
       const dom=items.length===1?items[0].status:Object.entries(items.reduce((a,d)=>{a[d.status]=(a[d.status]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1])[0][0];
       const m=L.circleMarker([lat,lng],{radius:inView?6:4,fillColor:sc(dom),color:inView?'rgba(0,0,0,.4)':'transparent',weight:inView?1.2:0,fillOpacity:inView?0.92:0.45});
-      if(items.length===1){
-        m.on('click',()=>openM(items[0]));
-        if(inView) m.bindTooltip(`<b>Poste ${items[0].poste}</b> — ${items[0].status}`,{direction:'top',sticky:true});
-      }else{
-        m.on('click',()=>{
-          _multiItems=items;
-          const html=items.map((d,i)=>`<div onclick="openMultiItem(${i})" style="cursor:pointer;padding:3px 6px;border-radius:4px;margin:2px 0;display:flex;gap:6px;align-items:center;font-size:11px"><span style="width:8px;height:8px;border-radius:50%;background:${sc(d.status)};flex-shrink:0;display:inline-block"></span><span><b>${d.poste||'—'}</b> — ${d.status} — ${d.id||'—'} — ${d.anomalia?d.anomalia.slice(0,6)+'...':'—'}</span></div>`).join('');
-          L.popup({maxWidth:280}).setLatLng([lat,lng]).setContent(`<div style="font-size:11px;font-weight:700;margin-bottom:5px">${items.length} serviços neste local</div>${html}`).openOn(map);
+      m.on('click',()=>{
+        const cp=map.latLngToContainerPoint([lat,lng]);
+        const nearby=filtered.filter(d=>{
+          if(!d.lat||!d.lng) return false;
+          const p=map.latLngToContainerPoint([d.lat,d.lng]);
+          return Math.hypot(cp.x-p.x,cp.y-p.y)<=15;
         });
-        if(inView) m.bindTooltip(`${items.length} serviços neste local`,{direction:'top',sticky:true});
+        if(nearby.length===1){openM(nearby[0]);}
+        else{
+          _multiItems=nearby;
+          const html=nearby.map((d,i)=>`<div onclick="openMultiItem(${i})" style="cursor:pointer;padding:3px 6px;border-radius:4px;margin:2px 0;display:flex;gap:6px;align-items:center;font-size:11px"><span style="width:8px;height:8px;border-radius:50%;background:${sc(d.status)};flex-shrink:0;display:inline-block"></span><span><b>${d.poste||'—'}</b> — ${d.status} — ${d.id||'—'} — ${d.anomalia?d.anomalia.slice(0,6)+'...':'—'}</span></div>`).join('');
+          L.popup({maxWidth:280}).setLatLng([lat,lng]).setContent(`<div style="font-size:11px;font-weight:700;margin-bottom:5px">${nearby.length} serviços próximos</div>${html}`).openOn(map);
+        }
+      });
+      if(inView){
+        const tip=items.length===1?`<b>Poste ${items[0].poste}</b> — ${items[0].status}`:`${items.length} serviços neste local`;
+        m.bindTooltip(tip,{direction:'top',sticky:true});
       }
       layerGroup.addLayer(m);
     });

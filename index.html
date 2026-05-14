@@ -973,6 +973,9 @@ function placeTeamMarkers(){
   });
 }
 
+let _multiItems=[];
+function openMultiItem(i){ map.closePopup(); openM(_multiItems[i]); }
+
 function haversine(a,b,c,d){
   const R=6371,p=Math.PI/180;
   const x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;
@@ -1031,12 +1034,29 @@ function renderMarkers(){
     });
   }else{
     hint.style.opacity='0';
+    const cg={};
     filtered.forEach(d=>{
       if(!d.lat||!d.lng) return;
-      const inView=bounds.contains([d.lat,d.lng]);
-      const m=L.circleMarker([d.lat,d.lng],{radius:inView?6:4,fillColor:sc(d.status),color:inView?'rgba(0,0,0,.4)':'transparent',weight:inView?1.2:0,fillOpacity:inView?0.92:0.45});
-      m.on('click',()=>openM(d));
-      if(inView) m.bindTooltip(`<b>Poste ${d.poste}</b> — ${d.status}`,{direction:'top',sticky:true});
+      const k=d.lat+','+d.lng;
+      if(!cg[k]) cg[k]=[];
+      cg[k].push(d);
+    });
+    Object.values(cg).forEach(items=>{
+      const lat=items[0].lat,lng=items[0].lng;
+      const inView=bounds.contains([lat,lng]);
+      const dom=items.length===1?items[0].status:Object.entries(items.reduce((a,d)=>{a[d.status]=(a[d.status]||0)+1;return a;},{})).sort((a,b)=>b[1]-a[1])[0][0];
+      const m=L.circleMarker([lat,lng],{radius:inView?6:4,fillColor:sc(dom),color:inView?'rgba(0,0,0,.4)':'transparent',weight:inView?1.2:0,fillOpacity:inView?0.92:0.45});
+      if(items.length===1){
+        m.on('click',()=>openM(items[0]));
+        if(inView) m.bindTooltip(`<b>Poste ${items[0].poste}</b> — ${items[0].status}`,{direction:'top',sticky:true});
+      }else{
+        m.on('click',()=>{
+          _multiItems=items;
+          const html=items.map((d,i)=>`<div onclick="openMultiItem(${i})" style="cursor:pointer;padding:3px 6px;border-radius:4px;margin:2px 0;display:flex;gap:6px;align-items:center;font-size:11px"><span style="width:8px;height:8px;border-radius:50%;background:${sc(d.status)};flex-shrink:0;display:inline-block"></span><span><b>${d.poste||'—'}</b> — ${d.status}</span></div>`).join('');
+          L.popup({maxWidth:280}).setLatLng([lat,lng]).setContent(`<div style="font-size:11px;font-weight:700;margin-bottom:5px">${items.length} serviços neste local</div>${html}`).openOn(map);
+        });
+        if(inView) m.bindTooltip(`${items.length} serviços neste local`,{direction:'top',sticky:true});
+      }
       layerGroup.addLayer(m);
     });
   }

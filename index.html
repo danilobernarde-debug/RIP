@@ -1051,7 +1051,7 @@ function renderMarkers(){
         const nearby=filtered.filter(d=>{
           if(!d.lat||!d.lng) return false;
           const p=map.latLngToContainerPoint([d.lat,d.lng]);
-          return Math.hypot(cp.x-p.x,cp.y-p.y)<=15;
+          return Math.hypot(cp.x-p.x,cp.y-p.y)<=5;
         });
         if(nearby.length===1){openM(nearby[0]);}
         else{

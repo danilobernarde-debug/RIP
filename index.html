@@ -887,15 +887,16 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 // ═══ STATS ═══
-function buildStats(){
-  const p=DATA.filter(d=>d.status==='Pendente').length;
-  const e=DATA.filter(d=>d.status==='Executado').length;
+function buildStats(src){
+  src=src||DATA;
+  const p=src.filter(d=>d.status==='Pendente').length;
+  const e=src.filter(d=>d.status==='Executado').length;
   document.getElementById('chip-p').textContent=p.toLocaleString('pt-BR')+' Pendentes';
   document.getElementById('chip-e').textContent=e.toLocaleString('pt-BR')+' Executados';
-  document.getElementById('chip-t').textContent=DATA.length.toLocaleString('pt-BR')+' Total';
+  document.getElementById('chip-t').textContent=src.length.toLocaleString('pt-BR')+' Total';
   document.getElementById('ex-p').textContent=p.toLocaleString('pt-BR');
   document.getElementById('ex-e').textContent=e.toLocaleString('pt-BR');
-  document.getElementById('ex-t').textContent=DATA.length.toLocaleString('pt-BR');
+  document.getElementById('ex-t').textContent=src.length.toLocaleString('pt-BR');
 }
 function buildFilterOpts(){
   const via=[...new Set(DATA.map(d=>d.viatura).filter(Boolean))].sort();
@@ -993,6 +994,7 @@ function applyF(){
     if(acVal.carteira && !d.carteira.toLowerCase().includes(acVal.carteira.toLowerCase())) return false;
     return true;
   });
+  buildStats(filtered);
   renderMarkers();
 }
 

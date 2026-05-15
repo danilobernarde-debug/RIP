@@ -459,6 +459,12 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
       <div class="lg-i"><div class="lg-d" style="background:#5a6580"></div>Outros</div>
       <div class="lg-i"><div class="lg-d" style="background:#ff5722;border:2px solid #fff"></div>Equipe</div>
     </div>
+  <!-- MODAL -->
+  <div id="modal-ov" onclick="if(event.target===this)closeM()">
+    <div id="modal-box">
+      <button class="m-close" onclick="closeM()">✕</button>
+      <div id="modal-body"></div>
+    </div>
   </div>
 </div>
 
@@ -508,13 +514,6 @@ select:focus,input:focus{border-color:rgba(255,87,34,.5)}
 </div>
 </div>
 
-<!-- MODAL -->
-<div id="modal-ov" onclick="if(event.target===this)closeM()">
-  <div id="modal-box">
-    <button class="m-close" onclick="closeM()">✕</button>
-    <div id="modal-body"></div>
-  </div>
-</div>
 <div id="notif"></div>
 
 <script>
